@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 import librosa
 import numpy as np
@@ -6,9 +6,11 @@ import pandas as pd
 from natsort import natsorted
 
 # Input files
-MIXED_AUDIO_FOLDER = "data/mixed"
-MIXED_LABEL_CSV = "data/Mix.csv"
-OUTPUT_FOLDER = "features"
+ROOT = Path(__file__).resolve().parents[2]
+RAW_DATA_DIR = ROOT / "data" / "raw"
+MIXED_AUDIO_FOLDER = RAW_DATA_DIR / "mixed"
+MIXED_LABEL_CSV = RAW_DATA_DIR / "Mix.csv"
+PROCESSED_DATA_DIR = ROOT / "data" / "processed"
 
 # Output csv names and folder
 OUT_HEART = "heart_only.csv"
@@ -27,10 +29,12 @@ RMS_HOP_SECONDS = 0.01
 HEART_LABEL = "Heart Sound Type"
 LUNG_LABEL = "Lung Sound Type"
 
+
 # Helper function to create the mean and standard deviation columns
 def add_mean_std(row, name, values):
     row[name + "_mean"] = float(np.mean(values))
     row[name + "_std"] = float(np.std(values))
+
 
 # Using the librosa library, we extract features from the audio files
 def extract_features(y, sr):
@@ -39,10 +43,9 @@ def extract_features(y, sr):
     if len(y) == 0:
         y = np.zeros(int(sr * 0.1))
 
-   
     mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=N_MFCC)
 
-    # Commonly, the first 13 (Mel-Frequency Cepstral Coefficients) are used in 
+    # Commonly, the first 13 (Mel-Frequency Cepstral Coefficients) are used in
     # projects like this. This helps summarize the shape and texture of the audio
     for i in range(N_MFCC):
         feature_name = "mfcc_" + str(i + 1)
@@ -63,6 +66,7 @@ def extract_features(y, sr):
 
     return row
 
+
 # Function when using sliding window to ensure the best spikes are chosen
 def get_spike_windows(y, sr):
     window_size = int(WINDOW_SECONDS * sr)
@@ -81,11 +85,9 @@ def get_spike_windows(y, sr):
         pad_amount = window_size - len(y)
         y = np.pad(y, (0, pad_amount))
 
-    rms_values = librosa.feature.rms(
-        y=y,
-        frame_length=frame_size,
-        hop_length=hop_size
-    )[0]
+    rms_values = librosa.feature.rms(y=y, frame_length=frame_size, hop_length=hop_size)[
+        0
+    ]
 
     nonzero = rms_values[rms_values > 0]
 
@@ -156,6 +158,7 @@ def get_spike_windows(y, sr):
 
     return windows
 
+
 # Combine all data into one row when not using the sliding window
 def make_row(path, file_id, label, diagnosis_columns, audio=None, sr=None):
     if audio is None or sr is None:
@@ -174,6 +177,7 @@ def make_row(path, file_id, label, diagnosis_columns, audio=None, sr=None):
 
     return row
 
+
 # Combine all data into one row when using the sliding window
 def make_window_rows(path, file_id, label, diagnosis_columns):
     y, sr = librosa.load(path, sr=None, mono=True)
@@ -187,12 +191,11 @@ def make_window_rows(path, file_id, label, diagnosis_columns):
 
     return rows
 
-# Create features folder if needed and save csvs
-def save_csv(rows, filename):
-    if not os.path.exists(OUTPUT_FOLDER):
-        os.makedirs(OUTPUT_FOLDER)
 
-    output_path = os.path.join(OUTPUT_FOLDER, filename)
+# Create features folder if needed and save csvs
+def save_csv(rows, filename, output_dir=PROCESSED_DATA_DIR):
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / filename
 
     df = pd.DataFrame(rows)
     df.to_csv(output_path, index=False)
@@ -200,8 +203,12 @@ def save_csv(rows, filename):
     print("Saved", len(rows), "rows to", output_path)
 
 
-def main():
-    label_df = pd.read_csv(MIXED_LABEL_CSV)
+def build_feature_tables(
+    audio_dir=MIXED_AUDIO_FOLDER,
+    labels_csv=MIXED_LABEL_CSV,
+    output_dir=PROCESSED_DATA_DIR,
+):
+    label_df = pd.read_csv(labels_csv)
 
     labels = {
         "H": label_df.set_index("Heart Sound ID").to_dict("index"),
@@ -211,14 +218,10 @@ def main():
 
     files = []
 
-    for filename in os.listdir(MIXED_AUDIO_FOLDER):
-        full_path = os.path.join(MIXED_AUDIO_FOLDER, filename)
-
-        if os.path.isfile(full_path):
-            name, extension = os.path.splitext(filename)
-
-            if extension.lower() == ".wav":
-                files.append(full_path)
+    for path in audio_dir.iterdir():
+        if path.is_file():
+            if path.suffix.lower() == ".wav":
+                files.append(path)
 
     files = natsorted(files)
 
@@ -228,38 +231,38 @@ def main():
     mixed_lung_rows = []
 
     for path in files:
-        filename = os.path.basename(path)
-        name, extension = os.path.splitext(filename)
-        file_id = name.strip()
-
+        file_id = path.stem.strip()
         prefix = file_id[0].upper()
         label = labels.get(prefix, {}).get(file_id)
 
         if label is None:
-            print("Skipping file with no label:", filename)
+            print("Skipping file with no label:", path.name)
             continue
 
-        print("Processing", filename)
+        print("Processing", path.name)
 
         if prefix == "H":
-            row = make_row(path, file_id, label, [HEART_LABEL])
-            heart_rows.append(row)
+            heart_rows.append(make_row(path, file_id, label, [HEART_LABEL]))
 
         elif prefix == "L":
-            rows = make_window_rows(path, file_id, label, [LUNG_LABEL])
-            lung_rows.extend(rows)
+            lung_rows.extend(make_window_rows(path, file_id, label, [LUNG_LABEL]))
 
         elif prefix == "M":
-            row = make_row(path, file_id, label, [HEART_LABEL, LUNG_LABEL])
-            mixed_heart_rows.append(row)
+            mixed_heart_rows.append(
+                make_row(path, file_id, label, [HEART_LABEL, LUNG_LABEL])
+            )
+            mixed_lung_rows.extend(
+                make_window_rows(path, file_id, label, [HEART_LABEL, LUNG_LABEL])
+            )
 
-            rows = make_window_rows(path, file_id, label, [HEART_LABEL, LUNG_LABEL])
-            mixed_lung_rows.extend(rows)
+    save_csv(heart_rows, OUT_HEART, output_dir)
+    save_csv(lung_rows, OUT_LUNG, output_dir)
+    save_csv(mixed_heart_rows, OUT_MIXED_HEART, output_dir)
+    save_csv(mixed_lung_rows, OUT_MIXED_LUNG, output_dir)
 
-    save_csv(heart_rows, OUT_HEART)
-    save_csv(lung_rows, OUT_LUNG)
-    save_csv(mixed_heart_rows, OUT_MIXED_HEART)
-    save_csv(mixed_lung_rows, OUT_MIXED_LUNG)
+
+def main():
+    build_feature_tables()
 
 
 if __name__ == "__main__":
