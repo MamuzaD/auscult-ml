@@ -9,10 +9,12 @@ uv sync
 uv run python scripts/preprocess_data.py
 ```
 
-Train the decision tree baselines:
+Train the decision tree and random forest baselines:
 
 ```bash
 uv run scripts/train_decision_tree.py
+uv run scripts/train_random_forest.py
+uv run scripts/train_all_models.py
 ```
 
 Run a single task or include metadata features:
@@ -20,6 +22,8 @@ Run a single task or include metadata features:
 ```bash
 uv run scripts/train_decision_tree.py --task lungs_only__lung
 uv run scripts/train_decision_tree.py --include-location --include-gender
+uv run scripts/train_random_forest.py --task lungs_only__lung
+uv run scripts/train_all_models.py --task lungs_only__lung --metadata none location both
 ```
 
 ## Installation

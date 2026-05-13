@@ -2,11 +2,11 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
-from sklearn.tree import DecisionTreeClassifier
 
 from auscult_ml.models.common import (
     ID_COL,
@@ -25,23 +25,27 @@ from auscult_ml.models.common import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-RESULTS_DIR = ROOT / "results" / "decision_tree"
+RESULTS_DIR = ROOT / "results" / "random_forest"
 
 
 def make_param_grid():
-    return [
-        {
-            "model__criterion": ["gini", "entropy"],
-            "model__max_depth": [5, 8, 12, None],
-            "model__min_samples_leaf": [1, 2, 4],
-            "model__min_samples_split": [2, 10],
-            "model__ccp_alpha": [0.0, 1e-3, 1e-2],
-            "model__class_weight": [None, "balanced"],
-        }
-    ]
+    return {
+        "model__n_estimators": [100, 200, 300],
+        "model__max_depth": [None, 8, 12, 20],
+        "model__min_samples_leaf": [1, 2, 4, 8],
+        "model__min_samples_split": [2, 5, 10],
+        "model__max_features": ["sqrt", 0.5, 0.75],
+        "model__class_weight": [None, "balanced", "balanced_subsample"],
+        "model__bootstrap": [True],
+    }
 
 
-def run_decision_tree(task_name, include_location=False, include_gender=False):
+def determine_search_iterations(task):
+    # harder to tune grouped, so slightly larger budget
+    return 24 if task.grouped else 18
+
+
+def run_random_forest(task_name, include_location=False, include_gender=False):
     if task_name not in TASKS:
         raise ValueError(f"Unknown task '{task_name}'. Choices: {sorted(TASKS)}")
 
@@ -67,7 +71,7 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
     fold_metrics = []
     fold_predictions = []
 
-    print(f"Running decision tree for {task.name} [{variant_name}]")
+    print(f"Running random forest for {task.name} [{variant_name}]")
 
     for fold_index, (train_idx, test_idx) in enumerate(
         splitter.split(X, y_encoded, groups), start=1
@@ -80,18 +84,23 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
         pipeline = Pipeline(
             steps=[
                 ("preprocessor", preprocessor),
-                ("model", DecisionTreeClassifier(random_state=RANDOM_STATE)),
+                (
+                    "model",
+                    RandomForestClassifier(random_state=RANDOM_STATE),
+                ),
             ]
         )
 
         # tune the model inside each training fold before testing on the holdout fold.
-        search = GridSearchCV(
+        search = RandomizedSearchCV(
             estimator=pipeline,
-            param_grid=make_param_grid(),
+            param_distributions=make_param_grid(),
+            n_iter=determine_search_iterations(task),
             scoring="f1_macro",
             cv=make_inner_splitter(X_train, y_train, task.grouped),
             n_jobs=-1,
             refit=True,
+            random_state=RANDOM_STATE + fold_index,
         )
 
         fit_kwargs = {}
@@ -146,7 +155,7 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
         predictions_df["y_true"], predictions_df["y_pred"], labels=labels
     )
 
-    # save a small summary so results are easy to compare later.
+    # save a small summary
     summary = {
         "task": task.name,
         "dataset": task.dataset,
@@ -173,5 +182,5 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
     pd.DataFrame([summary]).to_csv(output_dir / "summary.csv", index=False)
 
     relative_output_dir = output_dir.relative_to(ROOT)
-    print(f"Saved decision tree results to {relative_output_dir}")
+    print(f"Saved random forest results to {relative_output_dir}")
     return summary
