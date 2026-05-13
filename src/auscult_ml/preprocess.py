@@ -51,6 +51,13 @@ def extract_features(y, sr):
         feature_name = "mfcc_" + str(i + 1)
         add_mean_std(row, feature_name, mfccs[i])
 
+    # Delta MFCCs capture how the spectrum changes over time — heart beats are
+    # sharp transients while breath sounds are slower and more sustained, so
+    # deltas help distinguish them.
+    mfcc_delta = librosa.feature.delta(mfccs)
+    for i in range(N_MFCC):
+        add_mean_std(row, f"mfcc_{i + 1}_delta", mfcc_delta[i])
+
     # Gathering other features to ensure our model has as much information as possible
     centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
     bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr)
@@ -63,6 +70,13 @@ def extract_features(y, sr):
     add_mean_std(row, "rolloff", rolloff)
     add_mean_std(row, "zcr", zcr)
     add_mean_std(row, "rms", rms)
+
+    # Spectral contrast measures peak-vs-valley differences per frequency band,
+    # which helps distinguish harmonic murmurs from noise-like normal sounds.
+    # fmin=100, n_bands=4 keeps all bands within the 2000 Hz Nyquist at sr=4000.
+    contrast = librosa.feature.spectral_contrast(y=y, sr=sr, fmin=100, n_bands=4)
+    for i in range(contrast.shape[0]):
+        add_mean_std(row, f"contrast_{i + 1}", contrast[i])
 
     return row
 
