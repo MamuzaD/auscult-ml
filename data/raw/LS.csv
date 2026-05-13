@@ -44,7 +44,7 @@ M,Wheezing,LLA,M_W_LLA
 M,Rhonchi,LLA,M_R_LLA
 F,Normal,RLA,F_N_RLA
 M,Coarse Crackles,LMA,M_G_LMA
-M,Wheezing,LMA, M_W_LMA
+M,Wheezing,LMA,M_W_LMA
 F,Normal,RUA,F_N_RUA
 M,Pleural Rub,RLA,M_PR_RLA
 F,Coarse Crackles,LUA,F_G_LUA
