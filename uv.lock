@@ -91,6 +91,7 @@ dependencies = [
     { name = "natsort" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "scikit-learn" },
 ]
 
 [package.metadata]
@@ -99,6 +100,7 @@ requires-dist = [
     { name = "natsort", specifier = ">=8.4" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.2" },
+    { name = "scikit-learn", specifier = ">=1.4" },
 ]
 
 [[package]]
