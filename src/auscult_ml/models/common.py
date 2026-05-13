@@ -12,7 +12,9 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 ROOT = Path(__file__).resolve().parents[3]
 RAW_DATA_DIR = ROOT / "data" / "raw"
 PROCESSED_DATA_DIR = ROOT / "data" / "processed"
-METADATA_PATH = RAW_DATA_DIR / "Mix.csv"
+MIX_METADATA_PATH = RAW_DATA_DIR / "Mix.csv"
+HEART_METADATA_PATH = RAW_DATA_DIR / "HS.csv"
+LUNG_METADATA_PATH = RAW_DATA_DIR / "LS.csv"
 
 ID_COL = "id"
 HEART_LABEL = "Heart Sound Type"
@@ -84,23 +86,56 @@ def make_one_hot_encoder():
         return OneHotEncoder(handle_unknown="ignore", sparse=False)
 
 
+def clean_string_columns(df):
+    for column in df.columns:
+        if df[column].dtype == "object":
+            df[column] = df[column].str.strip()
+
+    return df
+
+
+def normalize_lung_file_id(file_id):
+    return file_id.replace("_C_", "_FC_").replace("_G_", "_CC_")
+
+
+def metadata_frame(path, id_column, normalize_id=None):
+    metadata = clean_string_columns(pd.read_csv(path))
+    frame = metadata[[id_column, "Location", "Gender"]].rename(
+        columns={id_column: ID_COL}
+    )
+
+    if normalize_id is not None:
+        frame[ID_COL] = frame[ID_COL].map(normalize_id)
+
+    return frame
+
+
 def build_metadata_lookup():
-    metadata = pd.read_csv(METADATA_PATH)
+    mix_metadata = clean_string_columns(pd.read_csv(MIX_METADATA_PATH))
 
     frames = [
-        metadata[["Heart Sound ID", "Location", "Gender"]].rename(
+        mix_metadata[["Heart Sound ID", "Location", "Gender"]].rename(
             columns={"Heart Sound ID": ID_COL}
         ),
-        metadata[["Lung Sound ID", "Location", "Gender"]].rename(
+        mix_metadata[["Lung Sound ID", "Location", "Gender"]].rename(
             columns={"Lung Sound ID": ID_COL}
         ),
-        metadata[["Mixed Sound ID", "Location", "Gender"]].rename(
+        mix_metadata[["Mixed Sound ID", "Location", "Gender"]].rename(
             columns={"Mixed Sound ID": ID_COL}
         ),
     ]
 
-    return pd.concat(frames, ignore_index=True).drop_duplicates(subset=[ID_COL])
+    if HEART_METADATA_PATH.exists():
+        frames.append(metadata_frame(HEART_METADATA_PATH, "Heart Sound ID"))
 
+    if LUNG_METADATA_PATH.exists():
+        frames.append(
+            metadata_frame(
+                LUNG_METADATA_PATH, "Lung Sound ID", normalize_id=normalize_lung_file_id
+            )
+        )
+
+    return pd.concat(frames, ignore_index=True).drop_duplicates(subset=[ID_COL])
 
 def load_dataset(dataset_name, metadata_lookup):
     dataset_path = PROCESSED_DATA_DIR / dataset_name
