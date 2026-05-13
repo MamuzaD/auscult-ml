@@ -9,10 +9,8 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.tree import DecisionTreeClassifier
 
 from auscult_ml.models.common import (
-    HEART_LABEL,
     ID_COL,
     LABEL_COLUMNS,
-    LUNG_LABEL,
     RANDOM_STATE,
     TASKS,
     aggregate_group_predictions,
@@ -34,10 +32,10 @@ def make_param_grid():
     return [
         {
             "model__criterion": ["gini", "entropy"],
-            "model__max_depth": [3, 5, 8, 12, 16, 24, None],
-            "model__min_samples_leaf": [1, 2, 4, 8, 16],
-            "model__min_samples_split": [2, 5, 10, 20],
-            "model__ccp_alpha": [0.0, 1e-4, 1e-3, 1e-2, 1e-1],
+            "model__max_depth": [5, 8, 12, None],
+            "model__min_samples_leaf": [1, 2, 4],
+            "model__min_samples_split": [2, 10],
+            "model__ccp_alpha": [0.0, 1e-3, 1e-2],
             "model__class_weight": [None, "balanced"],
         }
     ]
@@ -70,7 +68,9 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
 
     print(f"Running decision tree for {task.name} [{variant_name}]")
 
-    for fold_index, (train_idx, test_idx) in enumerate(splitter.split(X, y_encoded, groups), start=1):
+    for fold_index, (train_idx, test_idx) in enumerate(
+        splitter.split(X, y_encoded, groups), start=1
+    ):
         X_train = X.iloc[train_idx]
         X_test = X.iloc[test_idx]
         y_train = y_encoded.iloc[train_idx]
@@ -79,7 +79,7 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
         pipeline = Pipeline(
             steps=[
                 ("preprocessor", preprocessor),
-                ("model", DecisionTreeClassifier(random_state=RANDOM_STATE, class_weight="balanced")),
+                ("model", DecisionTreeClassifier(random_state=RANDOM_STATE)),
             ]
         )
 
@@ -88,7 +88,7 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
             param_grid=make_param_grid(),
             scoring="f1_macro",
             cv=make_inner_splitter(X_train, y_train, task.grouped),
-            n_jobs=1,
+            n_jobs=-1,
             refit=True,
         )
 
@@ -103,7 +103,9 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
         classes = best_pipeline.named_steps["model"].classes_
 
         if task.aggregate_by_id:
-            predictions_df = aggregate_group_predictions(X_test[ID_COL], y_test, probabilities, classes)
+            predictions_df = aggregate_group_predictions(
+                X_test[ID_COL], y_test, probabilities, classes
+            )
         else:
             y_pred = classes[probabilities.argmax(axis=1)]
             predictions_df = pd.DataFrame(
@@ -114,8 +116,12 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
                 }
             )
 
-        predictions_df["y_true"] = label_encoder.inverse_transform(predictions_df["y_true"].astype(int))
-        predictions_df["y_pred"] = label_encoder.inverse_transform(predictions_df["y_pred"].astype(int))
+        predictions_df["y_true"] = label_encoder.inverse_transform(
+            predictions_df["y_true"].astype(int)
+        )
+        predictions_df["y_pred"] = label_encoder.inverse_transform(
+            predictions_df["y_pred"].astype(int)
+        )
         predictions_df["fold"] = fold_index
 
         metrics = score_predictions(predictions_df["y_true"], predictions_df["y_pred"])
@@ -133,7 +139,9 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
     metrics_df = pd.DataFrame(fold_metrics)
     predictions_df = pd.concat(fold_predictions, ignore_index=True)
     labels = sorted(predictions_df["y_true"].unique().tolist())
-    matrix = confusion_matrix(predictions_df["y_true"], predictions_df["y_pred"], labels=labels)
+    matrix = confusion_matrix(
+        predictions_df["y_true"], predictions_df["y_pred"], labels=labels
+    )
 
     summary = {
         "task": task.name,
@@ -155,7 +163,9 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
 
     metrics_df.to_csv(output_dir / "fold_metrics.csv", index=False)
     predictions_df.to_csv(output_dir / "predictions.csv", index=False)
-    pd.DataFrame(matrix, index=labels, columns=labels).to_csv(output_dir / "confusion_matrix.csv")
+    pd.DataFrame(matrix, index=labels, columns=labels).to_csv(
+        output_dir / "confusion_matrix.csv"
+    )
     pd.DataFrame([summary]).to_csv(output_dir / "summary.csv", index=False)
 
     relative_output_dir = output_dir.relative_to(ROOT)
