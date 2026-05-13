@@ -32,10 +32,9 @@ def make_param_grid():
     return [
         {
             "model__criterion": ["gini", "entropy"],
-            "model__max_depth": [5, 8, 12, None],
-            "model__min_samples_leaf": [1, 2, 4],
-            "model__min_samples_split": [2, 10],
-            "model__ccp_alpha": [0.0, 1e-3, 1e-2],
+            "model__max_depth": [3, 5, 8],
+            "model__min_samples_leaf": [4, 8, 16],
+            "model__ccp_alpha": [0.0, 1e-2],
             "model__class_weight": [None, "balanced"],
         }
     ]
