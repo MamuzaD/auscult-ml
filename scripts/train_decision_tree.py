@@ -1,24 +1,18 @@
-from argparse import ArgumentParser
 from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from cli_helpers import add_metadata_feature_arguments, add_task_argument, make_parser
 from auscult_ml.models.common import TASKS
 from auscult_ml.models.decision_tree import run_decision_tree
 
 
 def parse_args():
-    parser = ArgumentParser(description="Train and evaluate the decision tree model.")
-    parser.add_argument(
-        "--task",
-        choices=["all", *sorted(TASKS)],
-        default="all",
-        help="Task preset to run. Defaults to all tasks.",
-    )
-    parser.add_argument("--include-location", action="store_true", help="Include Location metadata.")
-    parser.add_argument("--include-gender", action="store_true", help="Include Gender metadata.")
+    parser = make_parser("Train and evaluate the decision tree model.")
+    add_task_argument(parser, TASKS)
+    add_metadata_feature_arguments(parser)
     return parser.parse_args()
 
 
