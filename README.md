@@ -32,6 +32,7 @@
 - **Multiple Baselines** - Trains decision tree, random forest, logistic regression, and SVM models.
 - **Metadata Variants** - Compares audio-only runs against audio plus location and gender variants.
 - **Cross-Validation Outputs** - Saves fold metrics, predictions, confusion matrices, and summaries for each run.
+- **Report Figures** - Combines saved model summaries into comparison tables and bar charts for the final report.
 
 ## Dataset
 
@@ -94,6 +95,14 @@ uv run scripts/train_svm.py
 uv run scripts/train_all_models.py
 ```
 
+### 5. Compare models and generate figures
+
+After training at least one model, collect the saved summaries and create tables/bar charts.
+
+```bash
+uv run scripts/compare_results.py
+```
+
 ## Usage
 
 ### Run a single task
@@ -128,11 +137,28 @@ Supported `--metadata` variants:
 - `gender`
 - `both`
 
+### Compare saved results
+
+```bash
+uv run scripts/compare_results.py --metric f1_macro_mean
+uv run scripts/compare_results.py --task mixed_windowed__lung --metric accuracy_mean
+uv run scripts/compare_results.py --no-plots
+```
+
+The comparison script writes:
+
+- `results/comparison/all_results.csv`
+- `results/comparison/best_by_task.csv`
+- `results/comparison/report_table.csv`
+- `results/comparison/parameter_summary.csv`
+- `results/comparison/*.png` bar charts
+- `results/comparison/*_confusion_matrix.png` confusion matrices
+
 ## Roadmap
 
 - [x] Preprocess raw auscultation audio into feature tables
 - [x] Train decision tree, random forest, logistic regression, and SVM baselines
 - [x] Support metadata variants for location and gender
 - [x] Save per-run metrics, predictions, confusion matrices, and summaries
-- [ ] Add a top-level comparison script or report for summarizing all model results
-- [ ] Add charts or notebook-based result analysis in the README or `notebooks/`
+- [x] Add a top-level comparison script for summarizing all model results
+- [x] Add charts for model comparison
