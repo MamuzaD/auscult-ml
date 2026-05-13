@@ -2,11 +2,11 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
-from sklearn.tree import DecisionTreeClassifier
 
 from auscult_ml.models.common import (
     ID_COL,
@@ -25,22 +25,19 @@ from auscult_ml.models.common import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-RESULTS_DIR = ROOT / "results" / "decision_tree"
+RESULTS_DIR = ROOT / "results" / "logistic_regression"
 
 
 def make_param_grid():
     return [
         {
-            "model__criterion": ["gini", "entropy"],
-            "model__max_depth": [3, 5, 8],
-            "model__min_samples_leaf": [4, 8, 16],
-            "model__ccp_alpha": [0.0, 1e-2],
+            "model__C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0],
             "model__class_weight": [None, "balanced"],
         }
     ]
 
 
-def run_decision_tree(task_name, include_location=False, include_gender=False):
+def run_logistic_regression(task_name, include_location=False, include_gender=False):
     if task_name not in TASKS:
         raise ValueError(f"Unknown task '{task_name}'. Choices: {sorted(TASKS)}")
 
@@ -66,7 +63,7 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
     fold_metrics = []
     fold_predictions = []
 
-    print(f"Running decision tree for {task.name} [{variant_name}]")
+    print(f"Running logistic regression for {task.name} [{variant_name}]")
 
     for fold_index, (train_idx, test_idx) in enumerate(
         splitter.split(X, y_encoded, groups), start=1
@@ -79,7 +76,14 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
         pipeline = Pipeline(
             steps=[
                 ("preprocessor", preprocessor),
-                ("model", DecisionTreeClassifier(random_state=RANDOM_STATE)),
+                (
+                    "model",
+                    LogisticRegression(
+                        random_state=RANDOM_STATE,
+                        max_iter=4000,
+                        solver="lbfgs",
+                    ),
+                ),
             ]
         )
 
@@ -172,5 +176,5 @@ def run_decision_tree(task_name, include_location=False, include_gender=False):
     pd.DataFrame([summary]).to_csv(output_dir / "summary.csv", index=False)
 
     relative_output_dir = output_dir.relative_to(ROOT)
-    print(f"Saved decision tree results to {relative_output_dir}")
+    print(f"Saved logistic regression results to {relative_output_dir}")
     return summary

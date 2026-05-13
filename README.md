@@ -14,6 +14,7 @@ Train the decision tree and random forest baselines:
 ```bash
 uv run scripts/train_decision_tree.py
 uv run scripts/train_random_forest.py
+uv run scripts/train_logistic_regression.py
 uv run scripts/train_all_models.py
 ```
 

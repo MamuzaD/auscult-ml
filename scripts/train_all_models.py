@@ -1,7 +1,8 @@
-from argparse import ArgumentParser
 from pathlib import Path
 import subprocess
 import sys
+
+from cli_helpers import add_metadata_variant_argument, add_passthrough_task_argument, make_parser
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "scripts"
@@ -15,21 +16,9 @@ METADATA_VARIANTS = {
 
 
 def parse_args():
-    parser = ArgumentParser(
-        description="Run every training script across selected metadata variants."
-    )
-    parser.add_argument(
-        "--task",
-        default="all",
-        help="Task preset to pass through to each training script. Defaults to all.",
-    )
-    parser.add_argument(
-        "--metadata",
-        nargs="+",
-        choices=list(METADATA_VARIANTS),
-        default=["none", "location", "gender", "both"],
-        help="Metadata variants to run. Defaults to all variants.",
-    )
+    parser = make_parser("Run every training script across selected metadata variants.")
+    add_passthrough_task_argument(parser)
+    add_metadata_variant_argument(parser, METADATA_VARIANTS)
     parser.add_argument(
         "--models",
         nargs="+",
