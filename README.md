@@ -9,6 +9,19 @@ uv sync
 uv run python scripts/preprocess_data.py
 ```
 
+Train the decision tree baselines:
+
+```bash
+uv run scripts/train_decision_tree.py
+```
+
+Run a single task or include metadata features:
+
+```bash
+uv run scripts/train_decision_tree.py --task lungs_only__lung
+uv run scripts/train_decision_tree.py --include-location --include-gender
+```
+
 ## Installation
 
 ```bash
