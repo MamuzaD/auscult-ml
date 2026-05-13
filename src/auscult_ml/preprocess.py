@@ -3,13 +3,21 @@ from pathlib import Path
 import librosa
 import numpy as np
 import pandas as pd
-from natsort import natsorted
+try:
+    from natsort import natsorted
+except ImportError:
+    def natsorted(items):
+        return sorted(items, key=lambda item: str(item))
 
 # Input files
 ROOT = Path(__file__).resolve().parents[2]
 RAW_DATA_DIR = ROOT / "data" / "raw"
 MIXED_AUDIO_FOLDER = RAW_DATA_DIR / "mixed"
+HEART_AUDIO_FOLDER = RAW_DATA_DIR / "heart"
+LUNG_AUDIO_FOLDER = RAW_DATA_DIR / "lung"
 MIXED_LABEL_CSV = RAW_DATA_DIR / "Mix.csv"
+HEART_LABEL_CSV = RAW_DATA_DIR / "HS.csv"
+LUNG_LABEL_CSV = RAW_DATA_DIR / "LS.csv"
 PROCESSED_DATA_DIR = ROOT / "data" / "processed"
 
 # Output csv names and folder
@@ -217,37 +225,85 @@ def save_csv(rows, filename, output_dir=PROCESSED_DATA_DIR):
     print("Saved", len(rows), "rows to", output_path)
 
 
-def build_feature_tables(
-    audio_dir=MIXED_AUDIO_FOLDER,
-    labels_csv=MIXED_LABEL_CSV,
-    output_dir=PROCESSED_DATA_DIR,
-):
-    label_df = pd.read_csv(labels_csv)
+def read_label_csv(path):
+    df = pd.read_csv(path)
 
-    labels = {
-        "H": label_df.set_index("Heart Sound ID").to_dict("index"),
-        "L": label_df.set_index("Lung Sound ID").to_dict("index"),
-        "M": label_df.set_index("Mixed Sound ID").to_dict("index"),
-    }
+    for column in df.columns:
+        if df[column].dtype == "object":
+            df[column] = df[column].str.strip()
+
+    return df
+
+
+def normalize_lung_file_id(file_id):
+    return file_id.replace("_C_", "_FC_").replace("_G_", "_CC_")
+
+
+def list_wav_files(audio_dir):
+    if not audio_dir.exists():
+        return []
 
     files = []
 
     for path in audio_dir.iterdir():
-        if path.is_file():
-            if path.suffix.lower() == ".wav":
-                files.append(path)
+        if path.is_file() and path.suffix.lower() == ".wav":
+            files.append(path)
 
-    files = natsorted(files)
+    return natsorted(files)
+
+
+def build_lookup(label_df, id_column, normalize_id=None):
+    lookup = {}
+
+    for _, label in label_df.iterrows():
+        file_id = str(label[id_column]).strip()
+
+        if normalize_id is not None:
+            file_id = normalize_id(file_id)
+
+        lookup[file_id] = label.to_dict()
+
+    return lookup
+
+
+def build_feature_tables(
+    mixed_audio_dir=MIXED_AUDIO_FOLDER,
+    heart_audio_dir=HEART_AUDIO_FOLDER,
+    lung_audio_dir=LUNG_AUDIO_FOLDER,
+    mixed_labels_csv=MIXED_LABEL_CSV,
+    heart_labels_csv=HEART_LABEL_CSV,
+    lung_labels_csv=LUNG_LABEL_CSV,
+    output_dir=PROCESSED_DATA_DIR,
+):
+    mixed_label_df = read_label_csv(mixed_labels_csv)
+
+    mixed_labels = {
+        "H": build_lookup(mixed_label_df, "Heart Sound ID"),
+        "L": build_lookup(mixed_label_df, "Lung Sound ID"),
+        "M": build_lookup(mixed_label_df, "Mixed Sound ID"),
+    }
+
+    heart_labels = {}
+    if heart_labels_csv.exists():
+        heart_label_df = read_label_csv(heart_labels_csv)
+        heart_labels = build_lookup(heart_label_df, "Heart Sound ID")
+
+    lung_labels = {}
+    if lung_labels_csv.exists():
+        lung_label_df = read_label_csv(lung_labels_csv)
+        lung_labels = build_lookup(
+            lung_label_df, "Lung Sound ID", normalize_id=normalize_lung_file_id
+        )
 
     heart_rows = []
     lung_rows = []
     mixed_heart_rows = []
     mixed_lung_rows = []
 
-    for path in files:
+    for path in list_wav_files(mixed_audio_dir):
         file_id = path.stem.strip()
         prefix = file_id[0].upper()
-        label = labels.get(prefix, {}).get(file_id)
+        label = mixed_labels.get(prefix, {}).get(file_id)
 
         if label is None:
             print("Skipping file with no label:", path.name)
@@ -269,11 +325,32 @@ def build_feature_tables(
                 make_window_rows(path, file_id, label, [HEART_LABEL, LUNG_LABEL])
             )
 
+    for path in list_wav_files(heart_audio_dir):
+        file_id = path.stem.strip()
+        label = heart_labels.get(file_id)
+
+        if label is None:
+            print("Skipping file with no label:", path.name)
+            continue
+
+        print("Processing", path.name)
+        heart_rows.append(make_row(path, file_id, label, [HEART_LABEL]))
+
+    for path in list_wav_files(lung_audio_dir):
+        file_id = path.stem.strip()
+        label = lung_labels.get(file_id)
+
+        if label is None:
+            print("Skipping file with no label:", path.name)
+            continue
+
+        print("Processing", path.name)
+        lung_rows.extend(make_window_rows(path, file_id, label, [LUNG_LABEL]))
+
     save_csv(heart_rows, OUT_HEART, output_dir)
     save_csv(lung_rows, OUT_LUNG, output_dir)
     save_csv(mixed_heart_rows, OUT_MIXED_HEART, output_dir)
     save_csv(mixed_lung_rows, OUT_MIXED_LUNG, output_dir)
-
 
 def main():
     build_feature_tables()
