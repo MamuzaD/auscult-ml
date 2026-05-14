@@ -60,22 +60,9 @@ This project uses the **[HLS-CMDS](https://archive.ics.uci.edu/dataset/1202/hls-
 
 - **Python 3.11+**
 - **uv** installed locally: <https://docs.astral.sh/uv/>
-- Raw data placed at `data/raw/`
-Expected raw data layout:
+- Raw data placed at `data/raw/` with `Mix.csv`, `HS.csv`, `LS.csv`, and matching `.wav` files under `mixed/`, `heart/`, and `lung/`
 
-```text
-data/raw/
-├── Mix.csv
-├── HS.csv
-├── LS.csv
-├── mixed/
-│   └── *.wav
-├── heart/
-│   └── *.wav
-└── lung/
-    └── *.wav
-```
-The preprocessing pipeline expects file IDs in `.csv` to match the `.wav` filenames in `data/raw/`.
+The preprocessing pipeline expects file IDs in the raw CSV files to match the `.wav` filenames.
 
 ## Quick Start
 
@@ -87,19 +74,7 @@ uv sync
 
 ### 2. Preprocess the raw audio
 
-This reads the raw label/metadata files:
-
-- `data/raw/Mix.csv`
-- `data/raw/HS.csv`
-- `data/raw/LS.csv`
-
-It then uses all matching `.wav` files found in:
-
-- `data/raw/mixed/`
-- `data/raw/heart/`
-- `data/raw/lung/`
-
-The processed feature tables are written to `data/processed/`.
+This reads `data/raw/Mix.csv`, `data/raw/HS.csv`, and `data/raw/LS.csv`, uses matching recordings from `data/raw/mixed/`, `data/raw/heart/`, and `data/raw/lung/`, and writes processed feature tables to `data/processed/`.
 
 ```bash
 uv run python scripts/preprocess_data.py
