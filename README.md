@@ -52,7 +52,7 @@ This project uses the **[HLS-CMDS](https://archive.ics.uci.edu/dataset/1202/hls-
 - **Heart Labels** - `NH`, `LDM`, `MSM`, `LSM`, `AF`, `S4`, `ESM`, `S3`, `T`, `AVB`
 - **Lung Labels** - `NL`, `W`, `FC`, `R`, `PR`, `CC`
 - **Sound ID** is only used to link metadata rows to audio files, not as a training feature
-- In this repo, the raw dataset is expected locally as `data/raw/Mix.csv` plus the corresponding `.wav` files under `data/raw/mixed/`
+- In this repo, the raw dataset is expected locally as `data/raw/Mix.csv`, `data/raw/HS.csv`, and `data/raw/LS.csv`, plus corresponding `.wav` files under `data/raw/mixed/`, `data/raw/heart/`, and `data/raw/lung/`
 
 </details>
 
@@ -60,9 +60,22 @@ This project uses the **[HLS-CMDS](https://archive.ics.uci.edu/dataset/1202/hls-
 
 - **Python 3.11+**
 - **uv** installed locally: <https://docs.astral.sh/uv/>
-- Raw data placed at `data/raw/Mix.csv` and `data/raw/mixed/*.wav`
+- Raw data placed at `data/raw/`
+Expected raw data layout:
 
-The preprocessing pipeline expects file IDs in `Mix.csv` to match the `.wav` filenames in `data/raw/mixed/`.
+```text
+data/raw/
+├── Mix.csv
+├── HS.csv
+├── LS.csv
+├── mixed/
+│   └── *.wav
+├── heart/
+│   └── *.wav
+└── lung/
+    └── *.wav
+```
+The preprocessing pipeline expects file IDs in `.csv` to match the `.wav` filenames in `data/raw/`.
 
 ## Quick Start
 
@@ -74,7 +87,19 @@ uv sync
 
 ### 2. Preprocess the raw audio
 
-This reads `data/raw/Mix.csv` and the `.wav` files in `data/raw/mixed/`, then writes processed feature tables to `data/processed/`.
+This reads the raw label/metadata files:
+
+- `data/raw/Mix.csv`
+- `data/raw/HS.csv`
+- `data/raw/LS.csv`
+
+It then uses all matching `.wav` files found in:
+
+- `data/raw/mixed/`
+- `data/raw/heart/`
+- `data/raw/lung/`
+
+The processed feature tables are written to `data/processed/`.
 
 ```bash
 uv run python scripts/preprocess_data.py
@@ -115,7 +140,7 @@ uv run scripts/train_svm.py --task mixed_windowed__lung
 
 ### Include metadata features
 
-Metadata is joined from `Mix.csv` and currently supports `Location` and `Gender`.
+Metadata is joined from the raw CSV files and currently supports `Location` and `Gender`.
 
 ```bash
 uv run scripts/train_decision_tree.py --include-location
